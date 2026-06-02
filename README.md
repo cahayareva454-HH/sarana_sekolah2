@@ -1,80 +1,174 @@
-# PhpSpreadsheet
+[![Latest Version](https://poser.pugx.org/thecodingmachine/safe/v/stable.svg)](https://packagist.org/packages/thecodingmachine/safe)
+[![Total Downloads](https://poser.pugx.org/thecodingmachine/safe/downloads.svg)](https://packagist.org/packages/thecodingmachine/safe)
+[![License](https://poser.pugx.org/thecodingmachine/safe/license.svg)](https://packagist.org/packages/thecodingmachine/safe)
+[![Tests](https://github.com/thecodingmachine/safe/workflows/Tests/badge.svg)](https://github.com/thecodingmachine/safe/actions)
+[![codecov](https://codecov.io/gh/thecodingmachine/safe/branch/master/graph/badge.svg)](https://codecov.io/gh/thecodingmachine/safe)
 
-[![Build Status](https://github.com/PHPOffice/PhpSpreadsheet/workflows/main/badge.svg)](https://github.com/PHPOffice/PhpSpreadsheet/actions)
-[![Code Coverage](https://coveralls.io/repos/github/PHPOffice/PhpSpreadsheet/badge.svg?branch=master)](https://coveralls.io/github/PHPOffice/PhpSpreadsheet?branch=master)
-[![Total Downloads](https://img.shields.io/packagist/dt/PHPOffice/PhpSpreadsheet)](https://packagist.org/packages/phpoffice/phpspreadsheet)
-[![Latest Stable Version](https://img.shields.io/github/v/release/PHPOffice/PhpSpreadsheet)](https://packagist.org/packages/phpoffice/phpspreadsheet)
-[![License](https://poser.pugx.org/phpoffice/phpspreadsheet/license)](https://packagist.org/packages/phpoffice/phpspreadsheet)
-[![Join the chat at https://gitter.im/PHPOffice/PhpSpreadsheet](https://img.shields.io/badge/GITTER-join%20chat-green.svg)](https://gitter.im/PHPOffice/PhpSpreadsheet)
+Safe PHP
+========
 
-PhpSpreadsheet is a library written in pure PHP and offers a set of classes that
-allow you to read and write various spreadsheet file formats such as Excel and LibreOffice Calc.
+A set of core PHP functions rewritten to throw exceptions instead of returning `false` when an error is encountered.
 
-This is the master branch, and is maintained for security and bug fixes.
+## The problem
 
-## PHP Version Support
+Most PHP core functions were written before exception handling was added to the language. Therefore, most PHP functions
+do not throw exceptions. Instead, they return `false` in case of error.
 
-LTS: For maintained branches, support for PHP versions will only be maintained for a period of six months beyond the
-[end of life](https://www.php.net/supported-versions) of that PHP version.
+But most of us are too lazy to check explicitly for every single return of every core PHP function.
 
-Currently the required PHP minimum version is PHP __8.1__, and we [will support that version](https://www.php.net/supported-versions.php) until 30th June 2026.
+```php
+// This code is incorrect. Twice.
+// "file_get_contents" can return false if the file does not exist
+// "json_decode" can return false if the file content is not valid JSON
+$content = file_get_contents('foobar.json');
+$foobar = json_decode($content);
+```
 
-See the `composer.json` for other requirements.
+The correct version of this code would be:
+
+```php
+$content = file_get_contents('foobar.json');
+if ($content === false) {
+    throw new FileLoadingException('Could not load file foobar.json');
+}
+$foobar = json_decode($content);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    throw new FileLoadingException('foobar.json does not contain valid JSON: '.json_last_error_msg());
+}
+```
+
+Obviously, while this snippet is correct, it is less easy to read.
+
+## The solution
+
+Enter *thecodingmachine/safe* aka Safe-PHP.
+
+Safe-PHP redeclares all core PHP functions. The new PHP functions act exactly as the old ones, except they
+throw exceptions properly when an error is encountered. The "safe" functions have the same name as the core PHP
+functions, except they are in the `Safe` namespace.
+
+```php
+use function Safe\file_get_contents;
+use function Safe\json_decode;
+
+// This code is both safe and simple!
+$content = file_get_contents('foobar.json');
+$foobar = json_decode($content);
+```
+
+All PHP functions that can return `false` on error are part of Safe.
+In addition, Safe also provide 2 'Safe' classes: `Safe\DateTime` and `Safe\DateTimeImmutable` whose methods will throw exceptions instead of returning false.
+
+## PHPStan integration
+
+> Yeah... but I must explicitly think about importing the "safe" variant of the function, for each and every file of my application.
+> I'm sure I will forget some "use function" statements!
+
+Fear not! thecodingmachine/safe comes with a PHPStan rule.
+
+Never heard of [PHPStan](https://github.com/phpstan/phpstan) before?
+Check it out, it's an amazing code analyzer for PHP.
+
+Simply install the Safe rule in your PHPStan setup (explained in the "Installation" section) and PHPStan will let you know each time you are using an "unsafe" function.
+
+The code below will trigger this warning:
+
+```php
+$content = file_get_contents('foobar.json');
+```
+
+> Function file_get_contents is unsafe to use. It can return FALSE instead of throwing an exception. Please add 'use function Safe\\file_get_contents;' at the beginning of the file to use the variant provided by the 'thecodingmachine/safe' library.
 
 ## Installation
 
-See the [install instructions](https://phpspreadsheet.readthedocs.io/en/latest/#installation).
+Use composer to install Safe-PHP:
 
-## Documentation
+```bash
+composer require thecodingmachine/safe
+```
 
-Read more about it, including install instructions, in the [official documentation](https://phpspreadsheet.readthedocs.io). Or check out the [API documentation](https://phpoffice.github.io/PhpSpreadsheet).
+*Highly recommended*: install PHPStan and PHPStan extension:
 
-Please ask your support questions on [StackOverflow](https://stackoverflow.com/questions/tagged/phpspreadsheet), or have a quick chat on [Gitter](https://gitter.im/PHPOffice/PhpSpreadsheet).
+```bash
+composer require --dev thecodingmachine/phpstan-safe-rule
+```
 
-## Patreon
+Now, edit your `phpstan.neon` file and add these rules:
 
-I am now running a [Patreon](https://www.patreon.com/MarkBaker) to support the work that I do on PhpSpreadsheet.
+```yml
+includes:
+    - vendor/thecodingmachine/phpstan-safe-rule/phpstan-safe-rule.neon
+```
 
-Supporters will receive access to articles about working with PhpSpreadsheet, and how to use some of its more advanced features.
+## Automated refactoring
 
-Posts already available to Patreon supporters:
- - The Dating Game
-   - A  look at how MS Excel (and PhpSpreadsheet) handle date and time values.
-- Looping the Loop
-    - Advice on Iterating through the rows and cells in a worksheet.
+You have a large legacy codebase and want to use "Safe-PHP" functions throughout your project? PHPStan will help you
+find these functions but changing the namespace of the functions one function at a time might be a tedious task.
 
-And for Patrons at levels actively using PhpSpreadsheet:
- - Behind the Mask
-   - A look at Number Format Masks.
+Fortunately, Safe comes bundled with a "Rector" configuration file. [Rector](https://github.com/rectorphp/rector) is a command-line
+tool that performs instant refactoring of your application.
 
-The Next Article (currently Work in Progress):
- - Formula for Success
-   - How to debug formulae that don't produce the expected result.
+Run
 
+```bash
+composer require --dev rector/rector
+```
 
-My aim is to post at least one article each month, taking a detailed look at some feature of MS Excel and how to use that feature in PhpSpreadsheet, or on how to perform different activities in PhpSpreadsheet.
+to install `rector/rector`.
 
-Planned posts for the future include topics like:
- - Tables
- - Structured References
- - AutoFiltering
- - Array Formulae
- - Conditional Formatting
- - Data Validation
- - Value Binders
- - Images
- - Charts
+Run
 
-After a period of six months exclusive to Patreon supporters, articles will be incorporated into the public documentation for the library.
+```bash
+vendor/bin/rector process src/ --config vendor/thecodingmachine/safe/rector-migrate.php
+```
 
-## PHPExcel vs PhpSpreadsheet ?
+to run `rector/rector`.
 
-PhpSpreadsheet is the next version of PHPExcel. It breaks compatibility to dramatically improve the code base quality (namespaces, PSR compliance, use of latest PHP language features, etc.).
+*Note:* do not forget to replace "src/" with the path to your source directory.
 
-Because all efforts have shifted to PhpSpreadsheet, PHPExcel will no longer be maintained. All contributions for PHPExcel, patches and new features, should target PhpSpreadsheet `master` branch.
+**Important:** the refactoring only performs a "dumb" replacement of functions. It will not modify the way
+"false" return values are handled. So if your code was already performing error handling, you will have to deal
+with it manually.
 
-Do you need to migrate? There is [an automated tool](/docs/topics/migration-from-PHPExcel.md) for that.
+Especially, you should look for error handling that was already performed, like:
 
-## License
+```php
+if (!mkdir($dirPath)) {
+    // Do something on error
+}
+```
 
-PhpSpreadsheet is licensed under [MIT](https://github.com/PHPOffice/PhpSpreadsheet/blob/master/LICENSE).
+This code will be refactored by Rector to:
+
+```php
+if (!\Safe\mkdir($dirPath)) {
+    // Do something on error
+}
+```
+
+You should then (manually) refactor it to:
+
+```php
+try {
+    \Safe\mkdir($dirPath));
+} catch (\Safe\FilesystemException $e) {
+    // Do something on error
+}
+```
+
+## Performance impact
+
+Safe is loading 1000+ functions from ~85 files on each request. Yet, the performance impact of this loading is quite low.
+
+In case you worry, using Safe will "cost" you ~700µs on each request. The [performance section](performance/README.md)
+contains more information regarding the way we tested the performance impact of Safe.
+
+## Learn more
+
+Read [the release article on TheCodingMachine's blog](https://thecodingmachine.io/introducing-safe-php) if you want to
+learn more about what triggered the development of Safe-PHP.
+
+## Contributing
+
+The files that contain all the functions are auto-generated from the PHP doc.
+Read the [CONTRIBUTING.md](CONTRIBUTING.md) file to learn how to regenerate these files and to contribute to this library.
