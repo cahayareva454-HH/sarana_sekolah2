@@ -1,22 +1,9 @@
 <?php
 
-namespace PhpOffice\PhpSpreadsheet\Calculation;
+namespace PhpOffice\PhpSpreadsheet;
 
-use PhpOffice\PhpSpreadsheet\Exception as PhpSpreadsheetException;
+use RuntimeException;
 
-class Exception extends PhpSpreadsheetException
+class Exception extends RuntimeException
 {
-    public const CALCULATION_ENGINE_PUSH_TO_STACK = 1;
-
-    /**
-     * Error handler callback.
-     */
-    public static function errorHandlerCallback(int $code, string $string, string $file, int $line): void
-    {
-        $e = new self($string, $code);
-        $e->line = $line;
-        $e->file = $file;
-
-        throw $e;
-    }
 }
